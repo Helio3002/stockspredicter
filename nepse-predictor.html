@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NEPSE Predictor Terminal</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg: #0a0f0d;
+            --surface: #151e19;
+            --border: #23332a;
+            --text: #e0e6e2;
+            --text-muted: #8b9991;
+            --green: #4ac878;
+            --red: #e05252;
+            --amber: #f0a940;
+            --font-main: 'DM Sans', sans-serif;
+            --font-mono: 'IBM Plex Mono', monospace;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background-color: var(--bg); color: var(--text); font-family: var(--font-main); line-height: 1.5; }
+        .app-container { display: flex; flex-direction: column; height: 100vh; }
+        header { background: var(--surface); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
+        .logo { font-size: 1.25rem; font-weight: 700; color: var(--green); letter-spacing: 1px; }
+        .market-status { display: flex; gap: 2rem; align-items: center; }
+        .index-val { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 600; }
+        .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 700; }
+        .status-open { background: rgba(74, 200, 120, 0.2); color: var(--green); }
+        .status-closed { background: rgba(224, 82, 82, 0.2); color: var(--red); }
+        
+        .tabs { display: flex; gap: 1rem; padding: 1rem 2rem; border-bottom: 1px solid var(--border); }
+        .tab { background: none; border: none; color: var(--text-muted); font-family: var(--font-main); font-size: 1rem; cursor: pointer; padding: 0.5rem 1rem; border-radius: 4px; transition: 0.2s; }
+        .tab:hover { background: var(--surface); color: var(--text); }
+        .tab.active { background: var(--surface); color: var(--green); font-weight: 600; }
+
+        .content { flex: 1; padding: 2rem; overflow-y: auto; }
+        .panel { display: none; }
+        .panel.active { display: block; }
+        
+        .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+        .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; }
+        .card h2 { font-size: 1.1rem; color: var(--text-muted); margin-bottom: 1rem; text-transform: uppercase; letter-spacing: 1px; }
+        
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th { font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted); padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
+        td { padding: 1rem 0; font-family: var(--font-mono); font-size: 0.9rem; border-bottom: 1px solid var(--border); }
+        
+        .signal { padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem; text-align: center; display: inline-block; width: 90px; }
+        .sig-STRONG-BUY { background: rgba(74, 200, 120, 0.2); color: var(--green); border: 1px solid var(--green); }
+        .sig-BUY { color: var(--green); }
+        .sig-HOLD { color: var(--text-muted); }
+        .sig-SELL { color: var(--red); }
+        .sig-STRONG-SELL { background: rgba(224, 82, 82, 0.2); color: var(--red); border: 1px solid var(--red); }
+        
+        .text-green { color: var(--green); }
+        .text-red { color: var(--red); }
+
+        .flash-green { animation: flashG 1s; }
+        .flash-red { animation: flashR 1s; }
+        @keyframes flashG { 0% { background: rgba(74, 200, 120, 0.5); } 100% { background: transparent; } }
+        @keyframes flashR { 0% { background: rgba(224, 82, 82, 0.5); } 100% { background: transparent; } }
+
+        .form-group { margin-bottom: 1.5rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; color: var(--text-muted); }
+        .form-group input { width: 100%; max-width: 400px; padding: 0.75rem; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-family: var(--font-mono); }
+        .btn { padding: 0.75rem 1.5rem; background: var(--green); color: var(--bg); border: none; border-radius: 4px; font-weight: 700; cursor: pointer; }
+        .btn:hover { opacity: 0.9; }
+
+        /* Modal */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 15, 13, 0.8); backdrop-filter: blur(4px); align-items: center; justify-content: center; }
+        .modal.open { display: flex; }
+        .modal-content { background: var(--surface); border: 1px solid var(--border); padding: 2rem; border-radius: 8px; width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto; position: relative;}
+        .close { position: absolute; top: 1rem; right: 1.5rem; font-size: 1.5rem; cursor: pointer; color: var(--text-muted); }
+        
+        .ai-analysis { background: rgba(240, 169, 64, 0.1); border-left: 4px solid var(--amber); padding: 1rem; margin-top: 1rem; border-radius: 4px;}
+        .ai-analysis h4 { color: var(--amber); margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <div class="logo">NEPSE PREDICTOR</div>
+            <div class="market-status">
+                <div>Index: <span class="index-val" id="market-index">---</span> <span id="market-change">--</span></div>
+                <div id="market-badge" class="status-badge status-closed">CLOSED</div>
+                <div style="font-size: 0.8rem; color: var(--text-muted);">Updated: <span id="last-updated">Never</span></div>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('dashboard')">Dashboard</button>
+            <button class="tab" onclick="switchTab('all-stocks')">All Stocks</button>
+            <button class="tab" onclick="switchTab('watchlist')">Watchlist</button>
+            <button class="tab" onclick="switchTab('settings')">Settings</button>
+        </div>
+
+        <div class="content">
+            <div id="dashboard" class="panel active">
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <h2>Top Buys</h2>
+                        <table>
+                            <thead><tr><th>Symbol</th><th>LTP</th><th>RSI</th><th>Signal</th></tr></thead>
+                            <tbody id="top-buys-body"></tbody>
+                        </table>
+                    </div>
+                    <div class="card">
+                        <h2>Top Sells</h2>
+                        <table>
+                            <thead><tr><th>Symbol</th><th>LTP</th><th>RSI</th><th>Signal</th></tr></thead>
+                            <tbody id="top-sells-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="all-stocks" class="panel">
+                <div class="card">
+                    <input type="text" id="search" placeholder="Search symbol..." onkeyup="filterStocks()" style="margin-bottom:1rem; padding:0.5rem; background:var(--bg); border:1px solid var(--border); color:white;">
+                    <table>
+                        <thead><tr><th>Symbol</th><th>LTP</th><th>Change</th><th>Vol</th><th>RSI</th><th>MACD</th><th>Signal</th><th>Action</th></tr></thead>
+                        <tbody id="all-stocks-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="watchlist" class="panel">
+                <div class="card">
+                    <h2>My Watchlist</h2>
+                    <table>
+                        <thead><tr><th>Symbol</th><th>LTP</th><th>Change</th><th>Signal</th><th>Action</th></tr></thead>
+                        <tbody id="watchlist-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="settings" class="panel">
+                <div class="card" style="max-width: 600px;">
+                    <h2>Email Notifications</h2>
+                    <div class="form-group">
+                        <label>Notification Email Address</label>
+                        <input type="email" id="set-notify-email" placeholder="you@gmail.com">
+                    </div>
+                    <button class="btn" onclick="saveSettings()">Save Settings</button>
+                    <button class="btn" style="background:var(--amber); margin-left:1rem;" onclick="testEmail()">Send Test Email</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="stock-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2 id="modal-symbol" style="margin-bottom:0.5rem;">SYMBOL</h2>
+            <div style="display:flex; gap:2rem; margin-bottom:1rem; font-family:var(--font-mono);">
+                <div>LTP: <strong id="modal-ltp">---</strong></div>
+                <div>RSI: <strong id="modal-rsi">---</strong></div>
+                <div>Signal: <span id="modal-signal" class="signal">---</span></div>
+            </div>
+            
+            <div class="ai-analysis" id="modal-ai-box" style="display:none;">
+                <h4>OpenRouter AI Analysis</h4>
+                <div id="modal-ai-content" style="font-size:0.9rem;"></div>
+            </div>
+            <button class="btn" onclick="toggleWatchlist()" style="margin-top:1rem;" id="modal-watch-btn">Add to Watchlist</button>
+        </div>
+    </div>
+
+    <script>
+        let allStocksData = [];
+        let watchlist = JSON.parse(localStorage.getItem('nepse_watchlist') || '[]');
+
+        function switchTab(id) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(id).classList.add('active');
+            if(id === 'watchlist') renderWatchlist();
+            if(id === 'settings') loadSettings();
+        }
+
+        function formatSigClass(sig) { return `sig-${sig.replace(' ', '-')}`; }
+
+        function renderData(data) {
+            allStocksData = data.stocks;
+            document.getElementById('market-index').innerText = data.index.value;
+            const changeEl = document.getElementById('market-change');
+            changeEl.innerText = `${data.index.change > 0 ? '+' : ''}${data.index.change}`;
+            changeEl.className = data.index.change >= 0 ? 'text-green' : 'text-red';
+            
+            const badge = document.getElementById('market-badge');
+            badge.innerText = data.isOpen ? 'OPEN' : 'CLOSED';
+            badge.className = `status-badge status-${data.isOpen ? 'open' : 'closed'}`;
+            document.getElementById('last-updated').innerText = new Date(data.lastUpdated).toLocaleTimeString();
+
+            // Dashboard
+            const buys = [...data.stocks].filter(s => s.signal.includes('BUY')).sort((a,b)=>b.score-a.score).slice(0,5);
+            const sells = [...data.stocks].filter(s => s.signal.includes('SELL')).sort((a,b)=>a.score-b.score).slice(0,5);
+            
+            document.getElementById('top-buys-body').innerHTML = buys.map(s => 
+                `<tr onclick="openModal('${s.symbol}')" style="cursor:pointer;">
+                    <td>${s.symbol}</td><td>${s.ltp}</td><td>${s.indicators.rsi}</td>
+                    <td><span class="signal ${formatSigClass(s.signal)}">${s.signal}</span></td>
+                </tr>`).join('');
+                
+            document.getElementById('top-sells-body').innerHTML = sells.map(s => 
+                `<tr onclick="openModal('${s.symbol}')" style="cursor:pointer;">
+                    <td>${s.symbol}</td><td>${s.ltp}</td><td>${s.indicators.rsi}</td>
+                    <td><span class="signal ${formatSigClass(s.signal)}">${s.signal}</span></td>
+                </tr>`).join('');
+
+            renderAllStocks(data.stocks);
+            if(document.getElementById('watchlist').classList.contains('active')) renderWatchlist();
+        }
+
+        function renderAllStocks(stocks) {
+            document.getElementById('all-stocks-body').innerHTML = stocks.map(s => 
+                `<tr>
+                    <td style="cursor:pointer; color:var(--green);" onclick="openModal('${s.symbol}')">${s.symbol}</td>
+                    <td>${s.ltp}</td>
+                    <td class="${s.change >= 0 ? 'text-green' : 'text-red'}">${s.change}</td>
+                    <td>${s.volume}</td>
+                    <td>${s.indicators.rsi}</td>
+                    <td>${s.indicators.macd.toFixed(2)}</td>
+                    <td><span class="signal ${formatSigClass(s.signal)}">${s.signal}</span></td>
+                    <td><button onclick="toggleWatchlist('${s.symbol}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;">${watchlist.includes(s.symbol) ? '★' : '☆'}</button></td>
+                </tr>`).join('');
+        }
+
+        function filterStocks() {
+            const term = document.getElementById('search').value.toLowerCase();
+            const filtered = allStocksData.filter(s => s.symbol.toLowerCase().includes(term));
+            renderAllStocks(filtered);
+        }
+
+        function renderWatchlist() {
+            const wlStocks = allStocksData.filter(s => watchlist.includes(s.symbol));
+            document.getElementById('watchlist-body').innerHTML = wlStocks.map(s => 
+                `<tr>
+                    <td style="cursor:pointer; color:var(--green);" onclick="openModal('${s.symbol}')">${s.symbol}</td>
+                    <td>${s.ltp}</td>
+                    <td class="${s.change >= 0 ? 'text-green' : 'text-red'}">${s.change}</td>
+                    <td><span class="signal ${formatSigClass(s.signal)}">${s.signal}</span></td>
+                    <td><button onclick="toggleWatchlist('${s.symbol}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;">★</button></td>
+                </tr>`).join('');
+        }
+
+        function toggleWatchlist(symbol = document.getElementById('modal-symbol').innerText) {
+            if(watchlist.includes(symbol)) watchlist = watchlist.filter(s => s !== symbol);
+            else watchlist.push(symbol);
+            localStorage.setItem('nepse_watchlist', JSON.stringify(watchlist));
+            
+            const btn = document.getElementById('modal-watch-btn');
+            if(btn) btn.innerText = watchlist.includes(symbol) ? 'Remove from Watchlist' : 'Add to Watchlist';
+            renderAllStocks(allStocksData);
+            if(document.getElementById('watchlist').classList.contains('active')) renderWatchlist();
+        }
+
+        async function openModal(symbol) {
+            document.getElementById('stock-modal').classList.add('open');
+            document.getElementById('modal-symbol').innerText = symbol;
+            const btn = document.getElementById('modal-watch-btn');
+            btn.innerText = watchlist.includes(symbol) ? 'Remove from Watchlist' : 'Add to Watchlist';
+            
+            try {
+                const res = await fetch('/api/stock/' + symbol);
+                const data = await res.json();
+                document.getElementById('modal-ltp').innerText = data.ltp;
+                document.getElementById('modal-rsi').innerText = data.indicators.rsi;
+                
+                const sigEl = document.getElementById('modal-signal');
+                sigEl.innerText = data.signal;
+                sigEl.className = `signal ${formatSigClass(data.signal)}`;
+
+                const aiBox = document.getElementById('modal-ai-box');
+                if (data.ai) {
+                    aiBox.style.display = 'block';
+                    document.getElementById('modal-ai-content').innerHTML = `
+                        <b>Summary:</b> ${data.ai.summary}<br>
+                        <b>Key Reason:</b> ${data.ai.keyReason}<br>
+                        <b>Entry:</b> ${data.ai.entryZone} | <b>Target:</b> ${data.ai.target} | <b>SL:</b> ${data.ai.stopLoss}
+                    `;
+                } else {
+                    aiBox.style.display = 'none';
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        function closeModal() { document.getElementById('stock-modal').classList.remove('open'); }
+
+        async function loadSettings() {
+            const res = await fetch('/api/settings');
+            const data = await res.json();
+            document.getElementById('set-notify-email').value = data.notifyEmail || '';
+        }
+        async function saveSettings() {
+            const notifyEmail = document.getElementById('set-notify-email').value;
+            await fetch('/api/settings', {
+                method: 'POST', headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({notifyEmail})
+            });
+            alert('Settings saved');
+        }
+        async function testEmail() {
+            await fetch('/api/notify/test', { method: 'POST' });
+            alert('Test email requested (check console/inbox)');
+        }
+
+        // WebSockets
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}`);
+        ws.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+            if(msg.type === 'update') renderData(msg.data);
+        };
+
+        // Initial load
+        fetch('/api/market').then(r=>r.json()).then(index => {
+            fetch('/api/stocks').then(r=>r.json()).then(stocks => {
+                renderData({ index, stocks, isOpen: false, lastUpdated: new Date() });
+            });
+        });
+    </script>
+</body>
+</html>
