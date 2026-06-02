@@ -47,7 +47,7 @@
         th { font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-muted); padding-bottom: 1rem; border-bottom: 1px solid var(--border); }
         td { padding: 1rem 0; font-family: var(--font-mono); font-size: 0.9rem; border-bottom: 1px solid var(--border); }
         
-        .signal { padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem; text-align: center; display: inline-block; width: 90px; }
+        .signal { padding: 4px 8px; border-radius: 4px; font-weight: 600; font-size: 0.75rem; text-align: center; display: inline-block; width: 110px; }
         .sig-STRONG-BUY { background: rgba(74, 200, 120, 0.2); color: var(--green); border: 1px solid var(--green); }
         .sig-BUY { color: var(--green); }
         .sig-HOLD { color: var(--text-muted); }
@@ -57,19 +57,15 @@
         .text-green { color: var(--green); }
         .text-red { color: var(--red); }
 
-        .flash-green { animation: flashG 1s; }
-        .flash-red { animation: flashR 1s; }
-        @keyframes flashG { 0% { background: rgba(74, 200, 120, 0.5); } 100% { background: transparent; } }
-        @keyframes flashR { 0% { background: rgba(224, 82, 82, 0.5); } 100% { background: transparent; } }
-
         .form-group { margin-bottom: 1.5rem; }
         .form-group label { display: block; margin-bottom: 0.5rem; color: var(--text-muted); }
         .form-group input { width: 100%; max-width: 400px; padding: 0.75rem; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-family: var(--font-mono); }
         .btn { padding: 0.75rem 1.5rem; background: var(--green); color: var(--bg); border: none; border-radius: 4px; font-weight: 700; cursor: pointer; }
         .btn:hover { opacity: 0.9; }
+        .btn-sm { padding: 4px 8px; font-size: 0.75rem; }
 
         /* Modal */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 15, 13, 0.8); backdrop-filter: blur(4px); align-items: center; justify-content: center; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 15, 13, 0.8); backdrop-filter: blur(4px); align-items: center; justify-content: center; z-index: 1000; }
         .modal.open { display: flex; }
         .modal-content { background: var(--surface); border: 1px solid var(--border); padding: 2rem; border-radius: 8px; width: 90%; max-width: 800px; max-height: 90vh; overflow-y: auto; position: relative;}
         .close { position: absolute; top: 1rem; right: 1.5rem; font-size: 1.5rem; cursor: pointer; color: var(--text-muted); }
@@ -102,15 +98,35 @@
                     <div class="card">
                         <h2>Top Buys</h2>
                         <table>
-                            <thead><tr><th>Symbol</th><th>LTP</th><th>RSI</th><th>Signal</th></tr></thead>
-                            <tbody id="top-buys-body"></tbody>
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Company Name</th> 
+                                    <th>LTP</th>
+                                    <th>Change (%)</th>
+                                    <th>RSI</th>
+                                    <th>Signal</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="top-buys-table-body"></tbody>
                         </table>
                     </div>
                     <div class="card">
                         <h2>Top Sells</h2>
                         <table>
-                            <thead><tr><th>Symbol</th><th>LTP</th><th>RSI</th><th>Signal</th></tr></thead>
-                            <tbody id="top-sells-body"></tbody>
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Company Name</th> 
+                                    <th>LTP</th>
+                                    <th>Change (%)</th>
+                                    <th>RSI</th>
+                                    <th>Signal</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="top-sells-table-body"></tbody>
                         </table>
                     </div>
                 </div>
@@ -118,9 +134,20 @@
 
             <div id="all-stocks" class="panel">
                 <div class="card">
-                    <input type="text" id="search" placeholder="Search symbol..." onkeyup="filterStocks()" style="margin-bottom:1rem; padding:0.5rem; background:var(--bg); border:1px solid var(--border); color:white;">
+                    <input type="text" id="search" placeholder="Search symbol or name..." onkeyup="filterStocks()" style="margin-bottom:1rem; padding:0.5rem; background:var(--bg); border:1px solid var(--border); color:white; width: 100%; max-width: 300px; border-radius: 4px;">
                     <table>
-                        <thead><tr><th>Symbol</th><th>LTP</th><th>Change</th><th>Vol</th><th>RSI</th><th>MACD</th><th>Signal</th><th>Action</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Company Name</th>
+                                <th>LTP</th>
+                                <th>Change (%)</th>
+                                <th>Vol</th>
+                                <th>RSI</th>
+                                <th>Signal</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
                         <tbody id="all-stocks-body"></tbody>
                     </table>
                 </div>
@@ -130,7 +157,16 @@
                 <div class="card">
                     <h2>My Watchlist</h2>
                     <table>
-                        <thead><tr><th>Symbol</th><th>LTP</th><th>Change</th><th>Signal</th><th>Action</th></tr></thead>
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Company Name</th>
+                                <th>LTP</th>
+                                <th>Change (%)</th>
+                                <th>Signal</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
                         <tbody id="watchlist-body"></tbody>
                     </table>
                 </div>
@@ -153,17 +189,29 @@
     <div id="stock-modal" class="modal">
         <div class="modal-content">
             <span class="close" onclick="closeModal()">&times;</span>
-            <h2 id="modal-symbol" style="margin-bottom:0.5rem;">SYMBOL</h2>
+            <div style="margin-bottom: 1rem;">
+                <h2 id="modal-symbol" style="display:inline-block; margin:0; margin-right:0.5rem;">SYMBOL</h2>
+                <h4 id="modal-company-name" style="display:inline-block; margin:0; color:var(--text-muted); font-weight:normal;">Company Full Name</h4>
+            </div>
+            
             <div style="display:flex; gap:2rem; margin-bottom:1rem; font-family:var(--font-mono);">
                 <div>LTP: <strong id="modal-ltp">---</strong></div>
                 <div>RSI: <strong id="modal-rsi">---</strong></div>
                 <div>Signal: <span id="modal-signal" class="signal">---</span></div>
             </div>
             
+            <div class="ai-analysis" id="modal-quant-box" style="display:none; border-left-color: var(--green); background: rgba(74, 200, 120, 0.1);">
+                <h4 style="color: var(--green);">Quant Engine & ML Forecasts</h4>
+                <div id="modal-quant-content" style="font-size:0.9rem; font-family:var(--font-mono);">
+                    Calculating models...
+                </div>
+            </div>
+
             <div class="ai-analysis" id="modal-ai-box" style="display:none;">
                 <h4>OpenRouter AI Analysis</h4>
                 <div id="modal-ai-content" style="font-size:0.9rem;"></div>
             </div>
+            
             <button class="btn" onclick="toggleWatchlist()" style="margin-top:1rem;" id="modal-watch-btn">Add to Watchlist</button>
         </div>
     </div>
@@ -175,63 +223,77 @@
         function switchTab(id) {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-            event.target.classList.add('active');
+            if(event && event.target) {
+                event.target.classList.add('active');
+            }
             document.getElementById(id).classList.add('active');
             if(id === 'watchlist') renderWatchlist();
             if(id === 'settings') loadSettings();
         }
 
-        function formatSigClass(sig) { return `sig-${sig.replace(' ', '-')}`; }
+        function formatSigClass(sig) { 
+            return `sig-${(sig || 'HOLD').replace(' ', '-')}`; 
+        }
 
         function renderData(data) {
-            allStocksData = data.stocks;
-            document.getElementById('market-index').innerText = data.index.value;
+            if (!data || !data.index) return;
+            allStocksData = data.stocks || [];
+            
+            document.getElementById('market-index').innerText = data.index.value || '---';
             const changeEl = document.getElementById('market-change');
-            changeEl.innerText = `${data.index.change > 0 ? '+' : ''}${data.index.change}`;
+            changeEl.innerText = `${data.index.change > 0 ? '+' : ''}${data.index.change || '0'}`;
             changeEl.className = data.index.change >= 0 ? 'text-green' : 'text-red';
             
             const badge = document.getElementById('market-badge');
             badge.innerText = data.isOpen ? 'OPEN' : 'CLOSED';
             badge.className = `status-badge status-${data.isOpen ? 'open' : 'closed'}`;
-            document.getElementById('last-updated').innerText = new Date(data.lastUpdated).toLocaleTimeString();
+            document.getElementById('last-updated').innerText = new Date(data.lastUpdated || new Date()).toLocaleTimeString();
 
-            // Dashboard
-            const buys = [...data.stocks].filter(s => s.signal.includes('BUY')).sort((a,b)=>b.score-a.score).slice(0,5);
-            const sells = [...data.stocks].filter(s => s.signal.includes('SELL')).sort((a,b)=>a.score-b.score).slice(0,5);
+            // Render Dashboard top metrics lists safely
+            const buys = [...allStocksData].filter(s => s.signal && s.signal.includes('BUY')).sort((a,b)=>b.score-a.score).slice(0,5);
+            const sells = [...allStocksData].filter(s => s.signal && s.signal.includes('SELL')).sort((a,b)=>a.score-b.score).slice(0,5);
             
-            document.getElementById('top-buys-body').innerHTML = buys.map(s => 
-                `<tr onclick="openModal('${s.symbol}')" style="cursor:pointer;">
-                    <td>${s.symbol}</td><td>${s.ltp}</td><td>${s.indicators.rsi}</td>
-                    <td><span class="signal ${formatSigClass(s.signal)}">${s.signal}</span></td>
-                </tr>`).join('');
-                
-            document.getElementById('top-sells-body').innerHTML = sells.map(s => 
-                `<tr onclick="openModal('${s.symbol}')" style="cursor:pointer;">
-                    <td>${s.symbol}</td><td>${s.ltp}</td><td>${s.indicators.rsi}</td>
-                    <td><span class="signal ${formatSigClass(s.signal)}">${s.signal}</span></td>
-                </tr>`).join('');
+            const generateTableHTML = (stocksList) => {
+                return stocksList.map(stock => `
+                    <tr>
+                        <td><strong style="color:var(--green); cursor:pointer;" onclick="openModal('${stock.symbol}')">${stock.symbol}</strong></td>
+                        <td><span style="color: #aaa; font-size: 0.85rem;">${stock.name || 'N/A'}</span></td>
+                        <td>${stock.ltp}</td>
+                        <td style="color: ${stock.change >= 0 ? 'var(--green)' : 'var(--red)'}">${stock.change >= 0 ? '+' : ''}${stock.change}%</td>
+                        <td>${stock.indicators?.rsi || 'N/A'}</td>
+                        <td><span class="signal ${formatSigClass(stock.signal)}">${stock.signal}</span></td>
+                        <td><button class="btn btn-sm" onclick="openModal('${stock.symbol}')">Analyze</button></td>
+                    </tr>
+                `).join('');
+            };
 
-            renderAllStocks(data.stocks);
+            document.getElementById('top-buys-table-body').innerHTML = generateTableHTML(buys);
+            document.getElementById('top-sells-table-body').innerHTML = generateTableHTML(sells);
+
+            renderAllStocks(allStocksData);
             if(document.getElementById('watchlist').classList.contains('active')) renderWatchlist();
         }
 
         function renderAllStocks(stocks) {
             document.getElementById('all-stocks-body').innerHTML = stocks.map(s => 
                 `<tr>
-                    <td style="cursor:pointer; color:var(--green);" onclick="openModal('${s.symbol}')">${s.symbol}</td>
+                    <td style="cursor:pointer; color:var(--green); font-weight:bold;" onclick="openModal('${s.symbol}')">${s.symbol}</td>
+                    <td><span style="color:#aaa; font-size:0.85rem;">${s.name || 'N/A'}</span></td>
                     <td>${s.ltp}</td>
-                    <td class="${s.change >= 0 ? 'text-green' : 'text-red'}">${s.change}</td>
+                    <td class="${s.change >= 0 ? 'text-green' : 'text-red'}">${s.change >= 0 ? '+' : ''}${s.change}%</td>
                     <td>${s.volume}</td>
-                    <td>${s.indicators.rsi}</td>
-                    <td>${s.indicators.macd.toFixed(2)}</td>
+                    <td>${s.indicators?.rsi || 'N/A'}</td>
                     <td><span class="signal ${formatSigClass(s.signal)}">${s.signal}</span></td>
-                    <td><button onclick="toggleWatchlist('${s.symbol}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;">${watchlist.includes(s.symbol) ? '★' : '☆'}</button></td>
+                    <td><button onclick="toggleWatchlist('${s.symbol}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.1rem;">${watchlist.includes(s.symbol) ? '★' : '☆'}</button></td>
                 </tr>`).join('');
         }
 
         function filterStocks() {
             const term = document.getElementById('search').value.toLowerCase();
-            const filtered = allStocksData.filter(s => s.symbol.toLowerCase().includes(term));
+            const filtered = allStocksData.filter(s => 
+                s.symbol.toLowerCase().includes(term) || 
+                (s.name && s.name.toLowerCase().includes(term))
+            );
             renderAllStocks(filtered);
         }
 
@@ -239,56 +301,114 @@
             const wlStocks = allStocksData.filter(s => watchlist.includes(s.symbol));
             document.getElementById('watchlist-body').innerHTML = wlStocks.map(s => 
                 `<tr>
-                    <td style="cursor:pointer; color:var(--green);" onclick="openModal('${s.symbol}')">${s.symbol}</td>
+                    <td style="cursor:pointer; color:var(--green); font-weight:bold;" onclick="openModal('${s.symbol}')">${s.symbol}</td>
+                    <td><span style="color:#aaa; font-size:0.85rem;">${s.name || 'N/A'}</span></td>
                     <td>${s.ltp}</td>
-                    <td class="${s.change >= 0 ? 'text-green' : 'text-red'}">${s.change}</td>
+                    <td class="${s.change >= 0 ? 'text-green' : 'text-red'}">${s.change >= 0 ? '+' : ''}${s.change}%</td>
                     <td><span class="signal ${formatSigClass(s.signal)}">${s.signal}</span></td>
-                    <td><button onclick="toggleWatchlist('${s.symbol}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;">★</button></td>
+                    <td><button onclick="toggleWatchlist('${s.symbol}')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.1rem;">★</button></td>
                 </tr>`).join('');
         }
 
-        function toggleWatchlist(symbol = document.getElementById('modal-symbol').innerText) {
-            if(watchlist.includes(symbol)) watchlist = watchlist.filter(s => s !== symbol);
-            else watchlist.push(symbol);
+        function toggleWatchlist(symbol) {
+            const activeSymbol = symbol || document.getElementById('modal-symbol').innerText;
+            if(watchlist.includes(activeSymbol)) {
+                watchlist = watchlist.filter(s => s !== activeSymbol);
+            } else {
+                watchlist.push(activeSymbol);
+            }
             localStorage.setItem('nepse_watchlist', JSON.stringify(watchlist));
             
             const btn = document.getElementById('modal-watch-btn');
-            if(btn) btn.innerText = watchlist.includes(symbol) ? 'Remove from Watchlist' : 'Add to Watchlist';
+            if(btn) btn.innerText = watchlist.includes(activeSymbol) ? 'Remove from Watchlist' : 'Add to Watchlist';
             renderAllStocks(allStocksData);
             if(document.getElementById('watchlist').classList.contains('active')) renderWatchlist();
         }
 
         async function openModal(symbol) {
-            document.getElementById('stock-modal').classList.add('open');
-            document.getElementById('modal-symbol').innerText = symbol;
-            const btn = document.getElementById('modal-watch-btn');
-            btn.innerText = watchlist.includes(symbol) ? 'Remove from Watchlist' : 'Add to Watchlist';
+            const modal = document.getElementById('stock-modal');
+            modal.style.display = 'flex';
             
+            document.getElementById('modal-symbol').innerText = symbol;
+            document.getElementById('modal-company-name').innerText = "Loading company...";
+            document.getElementById('modal-ltp').innerText = "Loading...";
+            document.getElementById('modal-rsi').innerText = "Loading...";
+            
+            const sigEl = document.getElementById('modal-signal');
+            sigEl.innerText = "Loading...";
+            sigEl.className = "signal";
+            sigEl.style.color = "#fff";
+
+            document.getElementById('modal-quant-box').style.display = 'none';
+            document.getElementById('modal-ai-box').style.display = 'none';
+            
+            const btn = document.getElementById('modal-watch-btn');
+            if(btn) btn.innerText = watchlist.includes(symbol) ? 'Remove from Watchlist' : 'Add to Watchlist';
+
             try {
                 const res = await fetch('/api/stock/' + symbol);
+                if (!res.ok) throw new Error(`Server returned status ${res.status}`);
                 const data = await res.json();
-                document.getElementById('modal-ltp').innerText = data.ltp;
-                document.getElementById('modal-rsi').innerText = data.indicators.rsi;
                 
-                const sigEl = document.getElementById('modal-signal');
-                sigEl.innerText = data.signal;
+                document.getElementById('modal-symbol').innerText = data.symbol;
+                document.getElementById('modal-company-name').innerText = data.name || 'N/A';
+                document.getElementById('modal-ltp').innerText = data.ltp || 'N/A';
+                
+                const rsiVal = (data.indicators && data.indicators.rsi) ? data.indicators.rsi : (data.rsi || 'N/A');
+                document.getElementById('modal-rsi').innerText = typeof rsiVal === 'number' ? rsiVal.toFixed(2) : rsiVal;
+                
+                sigEl.innerText = data.signal || 'NEUTRAL';
                 sigEl.className = `signal ${formatSigClass(data.signal)}`;
+                if (data.signal && data.signal.includes('BUY')) {
+                    sigEl.style.color = '#4ac878';
+                } else if (data.signal && data.signal.includes('SELL')) {
+                    sigEl.style.color = '#ff4a4a';
+                } else {
+                    sigEl.style.color = '#aaa';
+                }
+
+                const quantBox = document.getElementById('modal-quant-box');
+                if (data.quant && data.quant.forecasts) {
+                    quantBox.style.display = 'block';
+                    let sigColor = '#aaa';
+                    if (data.quant.ml_signal === 'BUY') sigColor = '#4ac878';
+                    if (data.quant.ml_signal === 'SELL') sigColor = '#ff4a4a';
+
+                    document.getElementById('modal-quant-content').innerHTML = `
+                        <div><b>EMA/Trend Line:</b> Rs. ${data.quant.forecasts.arima}</div>
+                        <div><b>Monte Carlo (GBM):</b> Rs. ${data.quant.forecasts.gbm_monte_carlo}</div>
+                        <div><b>Random Forest (ML):</b> Rs. ${data.quant.forecasts.random_forest}</div>
+                        <div><b>XGBoost (ML):</b> Rs. ${data.quant.forecasts.xgboost}</div>
+                        <hr style="border-top:1px solid rgba(255,255,255,0.1); margin:0.5rem 0;">
+                        <div><b>Consensus Target:</b> Rs. ${data.quant.ml_consensus_target}</div> 
+                        <div><b>ML Directional Signal:</b> <span style="color: ${sigColor}; font-weight: bold;">${data.quant.ml_signal}</span></div>
+                    `;
+                } else {
+                    quantBox.style.display = 'block';
+                    document.getElementById('modal-quant-content').innerHTML = `<span style="color: #aaa;">Quant engine data un-routable. Verify execution ports.</span>`;
+                }
 
                 const aiBox = document.getElementById('modal-ai-box');
                 if (data.ai) {
                     aiBox.style.display = 'block';
                     document.getElementById('modal-ai-content').innerHTML = `
-                        <b>Summary:</b> ${data.ai.summary}<br>
-                        <b>Key Reason:</b> ${data.ai.keyReason}<br>
-                        <b>Entry:</b> ${data.ai.entryZone} | <b>Target:</b> ${data.ai.target} | <b>SL:</b> ${data.ai.stopLoss}
+                        <div><b>Summary:</b> ${data.ai.summary || 'N/A'}</div>
+                        <div style="margin: 0.3rem 0;"><b>Key Reason:</b> ${data.ai.keyReason || 'N/A'}</div>
+                        <div style="margin-top:0.3rem; font-family:var(--font-mono); font-size:0.85rem; color:var(--amber);"><b>Entry:</b> ${data.ai.entryZone || 'N/A'} | <b>Target:</b> ${data.ai.target || 'N/A'} | <b>SL:</b> ${data.ai.stopLoss || 'N/A'}</div>
                     `;
-                } else {
-                    aiBox.style.display = 'none';
                 }
-            } catch(e) { console.error(e); }
+            } catch(e) { 
+                console.error("Modal UI render crashed:", e);
+                document.getElementById('modal-ltp').innerText = "Error loading";
+                document.getElementById('modal-rsi').innerText = "Error loading";
+                sigEl.innerText = "ERROR";
+            }
         }
 
-        function closeModal() { document.getElementById('stock-modal').classList.remove('open'); }
+        function closeModal() { 
+            const modal = document.getElementById('stock-modal');
+            modal.style.display = 'none'; 
+        }
 
         async function loadSettings() {
             const res = await fetch('/api/settings');
@@ -308,7 +428,6 @@
             alert('Test email requested (check console/inbox)');
         }
 
-        // WebSockets
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const ws = new WebSocket(`${protocol}//${window.location.host}`);
         ws.onmessage = (event) => {
@@ -316,12 +435,12 @@
             if(msg.type === 'update') renderData(msg.data);
         };
 
-        // Initial load
+        // Fallback Initialization
         fetch('/api/market').then(r=>r.json()).then(index => {
             fetch('/api/stocks').then(r=>r.json()).then(stocks => {
                 renderData({ index, stocks, isOpen: false, lastUpdated: new Date() });
-            });
-        });
+            }).catch(e => console.error("Initial stocks load failed", e));
+        }).catch(e => console.error("Initial market load failed", e));
     </script>
 </body>
 </html>

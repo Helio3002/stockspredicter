@@ -24,7 +24,7 @@ const AI_CACHE_TTL = 1800; // 30 min
 const PORT = process.env.PORT || 3001;
 const SCRAPE_HEADERS = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36' };
 
-let marketData = { index: {}, stocks: [], movers: {} };
+let marketData = { index: {}, stocks: [], lastUpdated: null, isOpen: false };
 let settings = loadSettings();
 
 function loadSettings() {
@@ -93,8 +93,7 @@ function calcMACD(data) {
     const ema12 = calcEMA(data, 12);
     const ema26 = calcEMA(data, 26);
     const macdLine = ema12 - ema26;
-    // Simplified signal line for snapshot calculation
-    const signalLine = macdLine * 0.9; // Approximation for snapshot without full MACD array
+    const signalLine = macdLine * 0.9; 
     return { macd: macdLine, signal: signalLine, hist: macdLine - signalLine };
 }
 
@@ -109,23 +108,17 @@ function calcBollinger(data, period = 20) {
 
 function evaluateSignal(price, rsi, macd, sma20, sma50, bb, volRatio, prevHist) {
     let score = 0;
-    // RSI
     if (rsi < 35) score += 2; else if (rsi < 45) score += 1;
     if (rsi > 65) score -= 1; else if (rsi > 75) score -= 2;
-    // MACD
     if (macd.hist > 0 && macd.hist > prevHist) score += 2;
     else if (macd.hist > 0) score += 1;
     else if (macd.hist < 0 && macd.hist < prevHist) score -= 2;
     else if (macd.hist < 0) score -= 1;
-    // SMA
     if (price > sma20 && sma20 > sma50) score += 2;
     else if (price > sma20) score += 1;
     else if (price < sma20 && sma20 < sma50) score -= 2;
-    // Bollinger
     if (bb.lower && price <= bb.lower * 1.05) score += 1;
     if (bb.upper && price >= bb.upper * 0.95) score -= 1;
-    
-    // Volume multiplier
     if (volRatio > 1.5) score = Math.sign(score) * Math.ceil(Math.abs(score) * 1.2);
 
     let signal = 'HOLD';
@@ -153,14 +146,11 @@ async function scrapeMarketSummary() {
 
 async function scrapeLiveStocks() {
     try {
-        // 1. Try the JSON endpoint first (works during active market hours)
         const { data } = await axios.get('https://merolagani.com/handlers/TechnicalChartHandler.ashx?type=live_market', { headers: SCRAPE_HEADERS });
-        
         if (Array.isArray(data) && data.length > 0) {
             return data;
         }
 
-        // 2. FALLBACK: If market is closed (returns empty), scrape the HTML table
         console.log("JSON endpoint empty (market closed). Falling back to HTML scrape...");
         const htmlRes = await axios.get('https://merolagani.com/latestmarket.aspx', { headers: SCRAPE_HEADERS });
         const $ = cheerio.load(htmlRes.data);
@@ -168,6 +158,7 @@ async function scrapeLiveStocks() {
         const stocks = [];
         $('table.table-hover tbody tr').each((i, el) => {
             const symbol = $(el).find('td').eq(0).text().trim();
+            const fullName = $(el).find('td').eq(0).find('a').attr('title') || symbol; // Fallback to symbol if title attr is missing
             const ltp = $(el).find('td').eq(1).text().trim().replace(/,/g, '');
             const change = $(el).find('td').eq(2).text().trim();
             const volume = $(el).find('td').eq(6).text().trim().replace(/,/g, '');
@@ -175,6 +166,7 @@ async function scrapeLiveStocks() {
             if (symbol && ltp) {
                 stocks.push({
                     s: symbol,
+                    n: fullName,
                     lp: ltp,
                     pc: change || "0",
                     v: volume || "0"
@@ -183,33 +175,26 @@ async function scrapeLiveStocks() {
         });
         
         if (stocks.length > 0) return stocks;
-
     } catch (e) {
         console.error("Scrape Live Stocks Error:", e.message);
     }
-    
     return cache.get('liveStocks') || [];
 }
 
-// Mock historical fetcher to prevent massive IP blocks. In production, this queues slow fetches.
 async function fetchHistory(symbol, realLtp) {
     let hist = cache.get(`hist_${symbol}`);
     if (hist) return hist;
     
-    // Create a deterministic "seed" based on the stock's letters
-    // This guarantees the history will ALWAYS be exactly the same across server reboots
     let seed = 0;
     for (let i = 0; i < symbol.length; i++) {
         seed += symbol.charCodeAt(i);
     }
     
-    // Generate 30 days of stable history hovering within 5% of the REAL current price
     const mockData = Array.from({length: 30}, (_, i) => {
         const variance = Math.sin(seed + i) * (realLtp * 0.05); 
         return realLtp + variance;
     });
     
-    // Generate stable volumes
     const mockVols = Array.from({length: 30}, (_, i) => {
         return Math.abs(Math.cos(seed + i) * 50000) + 1000;
     });
@@ -220,71 +205,95 @@ async function fetchHistory(symbol, realLtp) {
 }
 
 async function updateMarketData() {
-    const market = await scrapeMarketSummary();
-    cache.set('marketIndex', market);
-    
-    const liveData = await scrapeLiveStocks();
-    if(liveData.length) cache.set('liveStocks', liveData);
-
-    let processedStocks = [];
-    for (let stock of liveData) {
-        const symbol = stock.s;
-        const ltp = parseFloat(stock.lp);
-        const volume = parseFloat(stock.v);
-        const change = parseFloat(stock.pc);
+    try {
+        const market = await scrapeMarketSummary();
+        cache.set('marketIndex', market);
         
-        const history = await fetchHistory(symbol, ltp);
-        const prices = [...history.closes, ltp];
-        const vols = [...history.volumes, volume];
-        
-        const rsi = calcRSI(prices);
-        const macd = calcMACD(prices);
-        const sma20 = calcSMA(prices, 20);
-        const sma50 = calcSMA(prices, 50);
-        const bb = calcBollinger(prices, 20);
-        
-        const avgVol = vols.slice(-10).reduce((a,b)=>a+b,0) / 10;
-        const volRatio = avgVol ? volume / avgVol : 1;
-        
-        const prevMacdHist = calcMACD(prices.slice(0,-1)).hist;
-        
-        const { score, signal } = evaluateSignal(ltp, rsi || 50, macd, sma20, sma50, bb, volRatio, prevMacdHist);
-        
-        processedStocks.push({
-            symbol, ltp, change, volume,
-            indicators: { rsi: Math.round(rsi||50), macd: macd.hist, sma20, sma50, volRatio },
-            score, signal
-        });
-    }
-
-    marketData = {
-        index: market,
-        stocks: processedStocks,
-        lastUpdated: new Date().toISOString(),
-        isOpen: isMarketOpen()
-    };
-    
-    // Broadcast
-    wss.clients.forEach(client => {
-        if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify({ type: 'update', data: marketData }));
+        const liveData = await scrapeLiveStocks();
+        if (!liveData || !liveData.length) {
+            console.log("[Data Engine] Warning: Scraper returned zero live stock entries.");
+            return;
         }
-    });
+        cache.set('liveStocks', liveData);
+
+        let processedStocks = [];
+        for (let stock of liveData) {
+            if (!stock || !stock.s) continue;
+
+            const symbol = stock.s.toUpperCase().trim();
+            const name = stock.n || stock.g || symbol; // Incorporates naming handles natively
+            const ltp = parseFloat(stock.lp) || 0;
+            const volume = parseFloat(stock.v) || 0;
+            const change = parseFloat(stock.pc) || 0;
+            
+            // Filter layout and structural sector elements out of dataset completely
+            const invalidSymbols = [
+                'HYDRO POWER', 'FINANCE', 'OTHERS', 'MANUFACTURING AND PROCESSING', 
+                'COMMERCIAL BANKS', 'DEVELOPMENT BANK LIMITED', 'NON-LIFE INSURANCE', 
+                'INVESTMENT', 'MICROFINANCE', 'HOTELS AND TOURISM', 'LIFE INSURANCE',
+                'TRADING', 'MUTUAL FUND', 'CORPORATE DEBENTURE'
+            ];
+            if (invalidSymbols.includes(symbol) || symbol.length > 8) {
+                continue;
+            }
+
+            const history = await fetchHistory(symbol, ltp);
+            const prices = [...history.closes, ltp];
+            const vols = [...history.volumes, volume];
+            
+            const rsi = calcRSI(prices);
+            const macd = calcMACD(prices);
+            const sma20 = calcSMA(prices, 20);
+            const sma50 = calcSMA(prices, 50);
+            const bb = calcBollinger(prices, 20);
+            
+            const avgVol = vols.slice(-10).reduce((a,b)=>a+b,0) / 10;
+            const volRatio = avgVol ? volume / avgVol : 1;
+            
+            const prevMacdHist = calcMACD(prices.slice(0,-1)).hist;
+            
+            const { score, signal } = evaluateSignal(ltp, rsi || 50, macd, sma20, sma50, bb, volRatio, prevMacdHist);
+            
+            processedStocks.push({
+                symbol, name, ltp, change, volume,
+                indicators: { rsi: Math.round(rsi||50), macd: macd.hist, sma20, sma50, volRatio },
+                score, signal
+            });
+        }
+
+        marketData = {
+            index: market,
+            stocks: processedStocks,
+            lastUpdated: new Date().toISOString(),
+            isOpen: isMarketOpen()
+        };
+        
+        wss.clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+                client.send(JSON.stringify({ type: 'update', data: marketData }));
+            }
+        });
+    } catch (globalLoopError) {
+        console.error("[Data Engine] Background loop handler exception:", globalLoopError.message);
+    }
 }
 
-// --- AI ANALYSIS ---
+// --- AI & QUANT ANALYSIS ---
 async function getAIAnalysis(stock) {
     const cacheKey = `ai_${stock.symbol}`;
     if (cache.get(cacheKey)) return cache.get(cacheKey);
 
-    const prompt = `You are an expert NEPSE stock analyst. Analyze ${stock.symbol} (LTP: ${stock.ltp}, RSI: ${stock.indicators.rsi}, Signal: ${stock.signal}).
+    const prompt = `You are an expert NEPSE stock analyst. Analyze ${stock.symbol} (${stock.name}) (LTP: ${stock.ltp}, RSI: ${stock.indicators.rsi}, Signal: ${stock.signal}).
     Return ONLY valid JSON format: {"summary":"string", "entryZone":"string", "target":"string", "stopLoss":"string", "riskLevel":"string", "timeframe":"string", "keyReason":"string"}`;
 
     try {
         const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
             model: 'nvidia/nemotron-3-super-120b-a12b:free',
             messages: [{ role: 'user', content: prompt }]
-        }, { headers: { 'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json' }});
+        }, { 
+            headers: { 'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`, 'Content-Type': 'application/json' },
+            timeout: 8000 // Fails early if openrouter lags
+        });
         
         const content = response.data.choices[0].message.content;
         const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -297,6 +306,21 @@ async function getAIAnalysis(stock) {
     }
 }
 
+async function getQuantAnalysis(symbol, prices) {
+    try {
+        const response = await axios.post('http://localhost:8000/analyze', {
+            symbol: symbol,
+            prices: prices
+        }, {
+            timeout: 15000 // Safe processing time margin for ML microservice
+        });
+        return response.data;
+    } catch (e) {
+        console.error(`Quant Engine failed for ${symbol}:`, e.message);
+        return null;
+    }
+}
+
 // --- EMAIL NOTIFICATIONS ---
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -304,8 +328,6 @@ const transporter = nodemailer.createTransport({
 });
 
 async function sendEmail(subject, html) {
-    console.log("Attempting login with Pass:", settings.emailPass); 
-    
     if (!settings.emailUser || !settings.notifyEmail) return;
     try {
         await transporter.sendMail({ from: settings.emailUser, to: settings.notifyEmail, subject, html });
@@ -323,49 +345,64 @@ async function sendDailyReport() {
     <h3>Top 5 BUYS</h3><ul>`;
     for(let s of buys) {
         const ai = await getAIAnalysis(s);
-        html += `<li><b>${s.symbol}</b> (LTP: ${s.ltp}) - ${s.signal} (RSI: ${s.indicators.rsi})<br>Reason: ${ai.keyReason}</li>`;
+        html += `<li><b>${s.symbol}</b> (${s.name}) (LTP: ${s.ltp}) - ${s.signal} (RSI: ${s.indicators.rsi})<br>Reason: ${ai.keyReason}</li>`;
     }
     html += `</ul><h3>Top 5 SELLS</h3><ul>`;
     for(let s of sells) {
         const ai = await getAIAnalysis(s);
-        html += `<li><b>${s.symbol}</b> (LTP: ${s.ltp}) - ${s.signal} (RSI: ${s.indicators.rsi})<br>Reason: ${ai.keyReason}</li>`;
+        html += `<li><b>${s.symbol}</b> (${s.name}) (LTP: ${s.ltp}) - ${s.signal} (RSI: ${s.indicators.rsi})<br>Reason: ${ai.keyReason}</li>`;
     }
     html += `</ul><hr><p><i>This is automated analysis, not financial advice.</i></p>`;
     sendEmail(`NEPSE Daily Signals - ${getNPTTime().toDateString()}`, html);
 }
 
 // --- SCHEDULING (UTC times) ---
-// 10:50 AM NPT = 05:05 UTC. Sun-Thu (0-4)
 cron.schedule('5 5 * * 0-4', sendDailyReport);
-
-// Market updates: every 5 mins.
-cron.schedule('*/5 * * * *', () => {
-    updateMarketData();
-});
+cron.schedule('*/5 * * * *', () => { updateMarketData(); });
 
 // --- API ENDPOINTS ---
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'nepse-predictor.html')));
-
 app.get('/api/status', (req, res) => res.json({ status: 'ok', marketOpen: isMarketOpen(), lastUpdated: marketData.lastUpdated }));
 app.get('/api/market', (req, res) => res.json(marketData.index));
 app.get('/api/stocks', (req, res) => res.json(marketData.stocks));
-app.get('/api/stocks/recommendations', async (req, res) => {
-    const buys = marketData.stocks.filter(s => s.signal.includes('BUY')).sort((a,b) => b.score - a.score).slice(0,10);
-    const sells = marketData.stocks.filter(s => s.signal.includes('SELL')).sort((a,b) => a.score - b.score).slice(0,10);
-    res.json({ buys, sells });
-});
-app.get('/api/stock/:symbol', async (req, res) => {
-    const stock = marketData.stocks.find(s => s.symbol === req.params.symbol.toUpperCase());
-    if(!stock) return res.status(404).json({error: 'Not found'});
-    let ai = null;
-    if(stock.score >= 4 || stock.score <= -4) ai = await getAIAnalysis(stock);
-    res.json({ ...stock, ai });
-});
 app.get('/api/settings', (req, res) => res.json({ notifyEmail: settings.notifyEmail, dailyReport: settings.dailyReport, intraday: settings.intraday }));
+
 app.post('/api/settings', (req, res) => { saveSettings(req.body); res.json({success: true}); });
 app.post('/api/notify/test', (req, res) => {
     sendEmail("Test Alert from NEPSE Predictor", "<p>This is a test notification.</p>");
     res.json({success: true});
+});
+
+app.get('/api/stock/:symbol', async (req, res) => {
+    const symbolParam = req.params.symbol.toUpperCase().trim();
+    const invalidSymbols = [
+        'HYDRO POWER', 'FINANCE', 'OTHERS', 'MANUFACTURING AND PROCESSING', 
+        'COMMERCIAL BANKS', 'DEVELOPMENT BANK LIMITED', 'NON-LIFE INSURANCE', 
+        'INVESTMENT', 'MICROFINANCE', 'HOTELS AND TOURISM', 'LIFE INSURANCE',
+        'TRADING', 'MUTUAL FUND', 'CORPORATE DEBENTURE'
+    ];
+    if (invalidSymbols.includes(symbolParam) || symbolParam.length > 8) {
+        return res.status(400).json({ error: 'Not a valid stock ticker symbol' });
+    }
+
+    const stock = marketData.stocks.find(s => s.symbol === symbolParam);
+    if (!stock) return res.status(404).json({ error: 'Stock symbol not found' });
+    
+    let ai = null;
+    if (stock.score >= 4 || stock.score <= -4) {
+        ai = await getAIAnalysis(stock);
+    }
+
+    const history = await fetchHistory(stock.symbol, stock.ltp);
+    const prices = [...history.closes, stock.ltp];
+    
+    if (!prices || prices.length < 5 || prices.every(p => p === stock.ltp)) {
+        return res.json({ ...stock, ai, quant: null });
+    }
+    
+    console.log(`[Quant Engine] Sending valid ticker ${stock.symbol} to Python for ML Analysis...`);
+    const quant = await getQuantAnalysis(stock.symbol, prices);
+    res.json({ ...stock, ai, quant });
 });
 
 // Init
